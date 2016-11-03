@@ -52,13 +52,18 @@ module Bosh::Director
         end
 
         unless instance_plan.already_detached?
+
+          Bosh::Director::RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
+
           Preparer.new(instance_plan, agent(instance), @logger).prepare
 
-          unless instance.model.state == 'stopped'
+          # current state
+          if instance.model.state != 'stopped'
             stop(instance_plan)
             take_snapshot(instance)
           end
 
+          # desired state
           if instance.state == 'stopped'
             instance.update_state
             return
@@ -96,6 +101,11 @@ module Bosh::Director
         end
 
         cleaner = RenderedJobTemplatesCleaner.new(instance.model, @blobstore, @logger)
+
+        # send them here too
+
+        Bosh::Director::RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
+
         state_applier = InstanceUpdater::StateApplier.new(
           instance_plan,
           agent(instance),
@@ -105,6 +115,8 @@ module Bosh::Director
         )
         state_applier.apply(instance_plan.desired_instance.instance_group.update)
       end
+
+
       InstanceUpdater::InstanceState.with_instance_update_and_event_creation(instance.model, parent_id, instance.deployment_model.name, action, &update_procedure)
     end
 

@@ -229,5 +229,50 @@ module Bosh::Director::Core::Templates
         expect { perform }.to raise_error(error)
       end
     end
+
+    describe '#generate_compressed_templates' do
+      def perform
+        instance.generate_compressed_templates
+      end
+
+      let(:temp_file) { instance_double('Tempfile', path: '/temp/archive/path.tgz', close!: nil) }
+      let(:templates) { [instance_double('Bosh::Director::Core::Templates::RenderedJobTemplate')] }
+      let(:compressed_archive) do
+        instance_double(
+          'Bosh::Director::Core::Templates::CompressedRenderedJobTemplates',
+          write: nil,
+          contents: nil,
+          sha1: 'fake-blob-sha1',
+        )
+      end
+
+      before do
+        allow(Tempfile).to receive(:new).and_return(temp_file)
+        allow(CompressedRenderedJobTemplates).to receive(:new).and_return(compressed_archive)
+      end
+
+      it 'compresses the provided RenderedJobTemplate objects' do
+        perform
+        expect(CompressedRenderedJobTemplates).to have_received(:new).with('/temp/archive/path.tgz')
+        expect(compressed_archive).to have_received(:write).with(templates)
+      end
+
+      it 'returns a CompressedRenderedJobTemplates object' do
+        result = perform
+        expect(result).to eq(compressed_archive)
+      end
+
+      it 'closes temporary file after the upload' do
+        expect(temp_file).to receive(:close!)
+        perform
+      end
+
+      it 'closes temporary file even when compression fails' do
+        error = Exception.new('error')
+        allow(compressed_archive).to receive(:write).and_raise(error)
+        expect(temp_file).to receive(:close!).ordered
+        expect { perform }.to raise_error(error)
+      end
+    end
   end
 end

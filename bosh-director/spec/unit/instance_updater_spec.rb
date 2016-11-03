@@ -98,7 +98,7 @@ module Bosh::Director
         let(:state_applier) { instance_double(InstanceUpdater::StateApplier) }
         before { allow(InstanceUpdater::StateApplier).to receive(:new).and_return(state_applier) }
 
-        it 'drains, stops, snapshots' do
+        it 'does NOT drain, stop, snapshot' do
           # https://www.pivotaltracker.com/story/show/121721619
           expect(Api::SnapshotManager).to_not receive(:take_snapshot)
           expect(agent_client).to_not receive(:stop)

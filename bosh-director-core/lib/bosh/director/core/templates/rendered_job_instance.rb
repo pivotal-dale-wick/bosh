@@ -46,5 +46,16 @@ module Bosh::Director::Core::Templates
     ensure
       file.close!
     end
+
+    def generate_compressed_templates
+      file = Tempfile.new('compressed-rendered-job-templates')
+
+      compressed_archive = CompressedRenderedJobTemplates.new(file.path)
+      compressed_archive.write(@job_templates)
+
+      compressed_archive
+    ensure
+      file.close
+    end
   end
 end
