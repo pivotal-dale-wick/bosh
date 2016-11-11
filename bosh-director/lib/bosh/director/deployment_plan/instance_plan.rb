@@ -18,7 +18,10 @@ module Bosh
 
         attr_reader :desired_instance, :existing_instance, :instance, :skip_drain, :recreate_deployment, :tags
 
-        attr_accessor :network_plans, :rendered_templates
+        attr_accessor :network_plans
+
+        # An instance of Bosh::Director::Core::Templates::RenderedJobInstance
+        attr_accessor :rendered_templates
 
         ##
         # @return [Boolean] returns true if the any of the expected specifications

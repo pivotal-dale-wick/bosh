@@ -59,6 +59,20 @@ module Bosh::Director
         allow(Time).to receive(:now).and_return(smurf_time)
       end
 
+      context 'when rendered templates do not exist for an instance' do
+        before do
+          allow(instance_plan).to receive(:rendered_templates).and_return(nil)
+        end
+
+        it 'returns without persisting templates in blobstore' do
+          expect(blobstore).to_not receive(:create)
+          expect(instance_model).to_not receive(:add_rendered_templates_archive)
+          expect(latest_rendered_templates_archive).to_not receive(:update)
+          expect(Bosh::Director::Core::Templates::RenderedTemplatesArchive).to_not receive(:new)
+          perform
+        end
+      end
+
       context 'when a rendered templates archive already exists in the DB' do
 
         context 'when the stored templates config hash matches the new templates config hash' do

@@ -235,7 +235,7 @@ module Bosh::Director::Core::Templates
         instance.generate_compressed_templates
       end
 
-      let(:temp_file) { instance_double('Tempfile', path: '/temp/archive/path.tgz', close!: nil) }
+      let(:temp_file) { instance_double('Tempfile', path: '/temp/archive/path.tgz', close: nil) }
       let(:templates) { [instance_double('Bosh::Director::Core::Templates::RenderedJobTemplate')] }
       let(:compressed_archive) do
         instance_double(
@@ -263,14 +263,14 @@ module Bosh::Director::Core::Templates
       end
 
       it 'closes temporary file after the upload' do
-        expect(temp_file).to receive(:close!)
+        expect(temp_file).to receive(:close)
         perform
       end
 
       it 'closes temporary file even when compression fails' do
         error = Exception.new('error')
         allow(compressed_archive).to receive(:write).and_raise(error)
-        expect(temp_file).to receive(:close!).ordered
+        expect(temp_file).to receive(:close).ordered
         expect { perform }.to raise_error(error)
       end
     end

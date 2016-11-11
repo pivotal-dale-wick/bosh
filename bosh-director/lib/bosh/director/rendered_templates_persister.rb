@@ -3,6 +3,11 @@ module Bosh::Director
     def self.persist(logger, blobstore, instance_plan)
       instance = instance_plan.instance
 
+      unless instance_plan.rendered_templates
+        logger.debug("Skipping persisting templates for '#{instance}', no templates")
+        return
+      end
+
       rendered_templates_archive_model = instance.model.latest_rendered_templates_archive
 
       if rendered_templates_archive_model && rendered_templates_archive_model.content_sha1 == instance.configuration_hash

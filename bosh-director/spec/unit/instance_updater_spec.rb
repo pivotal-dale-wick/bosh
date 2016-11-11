@@ -33,11 +33,12 @@ module Bosh::Director
     let(:tags) do
       {'key1' => 'value1'}
     end
+    let(:blobstore_client) { instance_double(Bosh::Blobstore::Client) }
     before do
       allow(Config).to receive_message_chain(:current_job, :username).and_return('user')
       allow(Config).to receive_message_chain(:current_job, :task_id).and_return('task-1', 'task-2')
       allow(Config).to receive_message_chain(:current_job, :event_manager).and_return(Api::EventManager.new({}))
-      allow(Bosh::Director::App).to receive_message_chain(:instance, :blobstores, :blobstore).and_return(instance_double(Bosh::Blobstore::Client))
+      allow(Bosh::Director::App).to receive_message_chain(:instance, :blobstores, :blobstore).and_return(blobstore_client)
       allow(Bosh::Director::VmDeleter).to receive(:new).and_return(vm_deleter)
       allow(Bosh::Director::VmRecreator).to receive(:new).and_return(vm_recreator)
     end
@@ -51,11 +52,12 @@ module Bosh::Director
       context 'when instance is currently started' do
         let(:instance_model_state) { 'started' }
 
-        it 'drains, stops, snapshots' do
+        it 'drains, stops, snapshots, and persists rendered templates to the blobstore' do
           expect(Api::SnapshotManager).to receive(:take_snapshot)
           expect(agent_client).not_to receive(:apply)
           expect(agent_client).to receive(:stop)
           expect(agent_client).to receive(:drain).and_return(0.1)
+          expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan)
 
           updater.update(instance_plan)
           expect(instance_model.state).to eq('stopped')
@@ -78,6 +80,12 @@ module Bosh::Director
           expect(instance_model.update_completed).to eq true
           expect(Models::Event.count).to eq 2
         end
+
+        it 'persists rendered templates to the blobstore' do
+          expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan)
+
+          updater.update(instance_plan)
+        end
       end
     end
 
@@ -98,7 +106,7 @@ module Bosh::Director
         let(:state_applier) { instance_double(InstanceUpdater::StateApplier) }
         before { allow(InstanceUpdater::StateApplier).to receive(:new).and_return(state_applier) }
 
-        it 'does NOT drain, stop, snapshot' do
+        it 'does NOT drain, stop, snapshot, but persists rendered templates to the blobstore' do
           # https://www.pivotaltracker.com/story/show/121721619
           expect(Api::SnapshotManager).to_not receive(:take_snapshot)
           expect(agent_client).to_not receive(:stop)
@@ -110,6 +118,8 @@ module Bosh::Director
           allow(instance).to receive(:update_instance_settings)
           expect(state_applier).to receive(:apply)
 
+          expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan).twice
+
           updater.update(instance_plan)
 
           expect(instance_model.update_completed).to eq true
@@ -117,17 +127,22 @@ module Bosh::Director
           expect(Models::Event.all[1].error).to be_nil
         end
 
-        it 'it recreates' do
-          allow(updater).to receive(:needs_recreate?).and_return(true)
-          allow(disk_manager).to receive(:update_persistent_disk)
-          allow(disk_manager).to receive(:unmount_disk_for)
-          allow(job).to receive(:update)
-          allow(vm_deleter).to receive(:delete_for_instance)
+        context 'when an instance needs to be recreated' do
+          before do
+            allow(updater).to receive(:needs_recreate?).and_return(true)
+            allow(disk_manager).to receive(:update_persistent_disk)
+            allow(disk_manager).to receive(:unmount_disk_for)
+            allow(job).to receive(:update)
+            allow(vm_deleter).to receive(:delete_for_instance)
+          end
 
-          expect(vm_recreator).to receive(:recreate_vm).with(anything, anything, tags)
-          expect(state_applier).to receive(:apply)
+          it 'recreates correctly, and persists rendered templates to the blobstore' do
+            expect(vm_recreator).to receive(:recreate_vm).with(anything, anything, tags)
+            expect(state_applier).to receive(:apply)
+            expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan).twice
 
-          updater.update(instance_plan)
+            updater.update(instance_plan)
+          end
         end
       end
     end
@@ -138,7 +153,7 @@ module Bosh::Director
         allow(DnsManagerProvider).to receive(:create).and_return(dns_manager)
       end
 
-      it 'should exit early without interacting at all with the agent' do
+      it 'should exit early without interacting at all with the agent, and does NOT persist rendered templates to the blobstore' do
         instance_model.update(dns_record_names: ['old.dns.record'])
         expect(instance_model.state).to eq('started')
         expect(Models::Event.count).to eq 0
@@ -155,6 +170,9 @@ module Bosh::Director
         network = DeploymentPlan::ManualNetwork.new('my-network', [subnet], logger)
         reservation = ExistingNetworkReservation.new(instance_model, network, '10.10.10.10', :dynamic)
         instance_plan.network_plans = [DeploymentPlan::NetworkPlanner::Plan.new(reservation: reservation, existing: true)]
+
+        expect(Bosh::Director::RenderedTemplatesPersister).to_not receive(:persist).with(logger, blobstore_client, instance_plan)
+
         updater.update(instance_plan)
 
         expect(instance_model.dns_record_names).to eq ['old.dns.record', '0.job-1.my-network.deployment.bosh', 'uuid-1.job-1.my-network.deployment.bosh']

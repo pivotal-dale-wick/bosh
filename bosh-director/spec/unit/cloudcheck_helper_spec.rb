@@ -179,6 +179,8 @@ module Bosh::Director
               expect(instance_plan.instance.env).to eq({'key1' => 'value1'})
             end
 
+            expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist)
+
             expect(fake_new_agent).to receive(:apply).with({'networks' => {'ip' => '192.1.3.4'}}).ordered
             expect(fake_new_agent).to receive(:run_script).with('pre-start', {}).ordered
             expect(fake_new_agent).to receive(:start).ordered

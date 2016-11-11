@@ -2,7 +2,7 @@ require 'spec_helper'
 
 module Bosh::Director
   describe JobRenderer do
-    subject(:persister) { described_class.new(logger) }
+    subject(:renderer) { described_class.new(logger) }
     let(:job) { DeploymentPlan::InstanceGroup.new(logger) }
 
     before do

@@ -51,9 +51,10 @@ module Bosh::Director
           return
         end
 
-        unless instance_plan.already_detached?
-
-          Bosh::Director::RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
+        if !instance_plan.already_detached?
+          # Rendered templates are persisted here, in the case where a vm is already soft stopped
+          # It will update the rendered templates on the VM
+          RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
 
           Preparer.new(instance_plan, agent(instance), @logger).prepare
 
@@ -65,12 +66,14 @@ module Bosh::Director
 
           # desired state
           if instance.state == 'stopped'
+            # Command issued: `bosh stop`
             instance.update_state
             return
           end
         end
 
         if instance.state == 'detached'
+          # Command issued: `bosh stop --hard`
           @logger.info("Detaching instance #{instance}")
           unless instance_plan.already_detached?
             @disk_manager.unmount_disk_for(instance_plan)
@@ -102,9 +105,7 @@ module Bosh::Director
 
         cleaner = RenderedJobTemplatesCleaner.new(instance.model, @blobstore, @logger)
 
-        # send them here too
-
-        Bosh::Director::RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
+        RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
 
         state_applier = InstanceUpdater::StateApplier.new(
           instance_plan,
