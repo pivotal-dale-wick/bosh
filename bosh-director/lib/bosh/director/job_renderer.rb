@@ -11,11 +11,11 @@ module Bosh::Director
       @logger = logger
     end
 
-    def render_job_instances(instance_plans, options = {})
-      instance_plans.each { |instance_plan| render_job_instance(instance_plan, options) }
+    def render_job_instances(instance_plans)
+      instance_plans.each { |instance_plan| render_job_instance(instance_plan) }
     end
 
-    def render_job_instance(instance_plan, options = {})
+    def render_job_instance(instance_plan)
       instance = instance_plan.instance
 
       if instance_plan.templates.empty?
