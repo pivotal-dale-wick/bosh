@@ -13,19 +13,22 @@ module Bosh::Director
       vm_deleter = VmDeleter.new(logger, false, Config.enable_virtual_delete_vms)
       vm_creator = VmCreator.new(logger, vm_deleter, disk_manager, job_renderer, agent_broadcaster)
       vm_recreator = VmRecreator.new(vm_creator, vm_deleter)
+      blobstore_client = App.instance.blobstores.blobstore
+      rendered_templates_persistor = RenderedTemplatesPersister.new(blobstore_client, logger)
       new(
         logger,
         ip_provider,
-        App.instance.blobstores.blobstore,
+        blobstore_client,
         vm_deleter,
         vm_creator,
         dns_manager,
         disk_manager,
-        vm_recreator
+        vm_recreator,
+        rendered_templates_persistor
       )
     end
 
-    def initialize(logger, ip_provider, blobstore, vm_deleter, vm_creator, dns_manager, disk_manager, vm_recreator)
+    def initialize(logger, ip_provider, blobstore, vm_deleter, vm_creator, dns_manager, disk_manager, vm_recreator, rendered_templates_persistor)
       @logger = logger
       @blobstore = blobstore
       @vm_deleter = vm_deleter
@@ -34,6 +37,7 @@ module Bosh::Director
       @disk_manager = disk_manager
       @ip_provider = ip_provider
       @vm_recreator = vm_recreator
+      @rendered_templates_persistor = rendered_templates_persistor
       @current_state = {}
     end
 
@@ -54,7 +58,7 @@ module Bosh::Director
         if !instance_plan.already_detached?
           # Rendered templates are persisted here, in the case where a vm is already soft stopped
           # It will update the rendered templates on the VM
-          RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
+          @rendered_templates_persistor.persist(instance_plan)
 
           Preparer.new(instance_plan, agent(instance), @logger).prepare
 
@@ -105,7 +109,7 @@ module Bosh::Director
 
         cleaner = RenderedJobTemplatesCleaner.new(instance.model, @blobstore, @logger)
 
-        RenderedTemplatesPersister.persist(@logger, @blobstore, instance_plan)
+        @rendered_templates_persistor.persist(instance_plan)
 
         state_applier = InstanceUpdater::StateApplier.new(
           instance_plan,

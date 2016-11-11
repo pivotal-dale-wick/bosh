@@ -34,6 +34,7 @@ module Bosh::Director
       {'key1' => 'value1'}
     end
     let(:blobstore_client) { instance_double(Bosh::Blobstore::Client) }
+    let(:rendered_templates_persistor) { instance_double(RenderedTemplatesPersister) }
     before do
       allow(Config).to receive_message_chain(:current_job, :username).and_return('user')
       allow(Config).to receive_message_chain(:current_job, :task_id).and_return('task-1', 'task-2')
@@ -41,6 +42,7 @@ module Bosh::Director
       allow(Bosh::Director::App).to receive_message_chain(:instance, :blobstores, :blobstore).and_return(blobstore_client)
       allow(Bosh::Director::VmDeleter).to receive(:new).and_return(vm_deleter)
       allow(Bosh::Director::VmRecreator).to receive(:new).and_return(vm_recreator)
+      allow(Bosh::Director::RenderedTemplatesPersister).to receive(:new).and_return(rendered_templates_persistor)
     end
 
     context 'when stopping instances' do
@@ -57,7 +59,7 @@ module Bosh::Director
           expect(agent_client).not_to receive(:apply)
           expect(agent_client).to receive(:stop)
           expect(agent_client).to receive(:drain).and_return(0.1)
-          expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan)
+          expect(rendered_templates_persistor).to receive(:persist).with(instance_plan)
 
           updater.update(instance_plan)
           expect(instance_model.state).to eq('stopped')
@@ -74,6 +76,7 @@ module Bosh::Director
           expect(agent_client).not_to receive(:apply)
           expect(agent_client).not_to receive(:stop)
           expect(agent_client).not_to receive(:drain)
+          allow(rendered_templates_persistor).to receive(:persist).with(instance_plan)
 
           updater.update(instance_plan)
           expect(instance_model.state).to eq('stopped')
@@ -82,7 +85,7 @@ module Bosh::Director
         end
 
         it 'persists rendered templates to the blobstore' do
-          expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan)
+          expect(rendered_templates_persistor).to receive(:persist).with(instance_plan)
 
           updater.update(instance_plan)
         end
@@ -117,8 +120,7 @@ module Bosh::Director
           allow(job).to receive(:update)
           allow(instance).to receive(:update_instance_settings)
           expect(state_applier).to receive(:apply)
-
-          expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan).twice
+          expect(rendered_templates_persistor).to receive(:persist).with(instance_plan).twice
 
           updater.update(instance_plan)
 
@@ -139,7 +141,7 @@ module Bosh::Director
           it 'recreates correctly, and persists rendered templates to the blobstore' do
             expect(vm_recreator).to receive(:recreate_vm).with(anything, anything, tags)
             expect(state_applier).to receive(:apply)
-            expect(Bosh::Director::RenderedTemplatesPersister).to receive(:persist).with(logger, blobstore_client, instance_plan).twice
+            expect(rendered_templates_persistor).to receive(:persist).with(instance_plan).twice
 
             updater.update(instance_plan)
           end
@@ -200,6 +202,7 @@ module Bosh::Director
         allow(disk_manager).to receive(:update_persistent_disk)
         allow(state_applier).to receive(:apply)
         allow(job).to receive(:update)
+        allow(rendered_templates_persistor).to receive(:persist).with(instance_plan)
 
         allow(logger).to receive(:debug)
 
@@ -212,6 +215,7 @@ module Bosh::Director
       before do
         allow(AgentClient).to receive(:with_vm_credentials_and_agent_id).with({'user' => 'secret'}, 'scool').and_return(agent_client)
         allow(instance_plan).to receive(:changes).and_return([:state])
+        allow(rendered_templates_persistor).to receive(:persist)
       end
 
       it 'should always add an event recording the error' do

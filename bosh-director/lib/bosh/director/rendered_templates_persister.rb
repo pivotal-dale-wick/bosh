@@ -1,20 +1,26 @@
 module Bosh::Director
   class RenderedTemplatesPersister
-    def self.persist(logger, blobstore, instance_plan)
+
+    def initialize(blobstore_client, logger)
+      @blobstore_client = blobstore_client
+      @logger = logger
+    end
+
+    def persist(instance_plan)
       instance = instance_plan.instance
 
       unless instance_plan.rendered_templates
-        logger.debug("Skipping persisting templates for '#{instance}', no templates")
+        @logger.debug("Skipping persisting templates for '#{instance}', no templates")
         return
       end
 
       rendered_templates_archive_model = instance.model.latest_rendered_templates_archive
 
       if rendered_templates_archive_model && rendered_templates_archive_model.content_sha1 == instance.configuration_hash
-        if !blobstore.exists?(rendered_templates_archive_model.blobstore_id)
+        if !@blobstore_client.exists?(rendered_templates_archive_model.blobstore_id)
           compressed_templates = instance_plan.rendered_templates.generate_compressed_templates
 
-          blobstore_id = blobstore.create(compressed_templates.contents)
+          blobstore_id = @blobstore_client.create(compressed_templates.contents)
           archive_sha1 = compressed_templates.sha1
 
           rendered_templates_archive_model.update({
@@ -30,7 +36,7 @@ module Bosh::Director
         compressed_templates = instance_plan.rendered_templates.generate_compressed_templates
 
         archive_sha1 = compressed_templates.sha1
-        blobstore_id = blobstore.create(compressed_templates.contents)
+        blobstore_id = @blobstore_client.create(compressed_templates.contents)
 
         instance.model.add_rendered_templates_archive(
           blobstore_id: blobstore_id,

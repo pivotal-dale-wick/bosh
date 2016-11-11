@@ -2,6 +2,7 @@ require 'spec_helper'
 
 module Bosh::Director
   describe RenderedTemplatesPersister do
+    subject(:persistor) { RenderedTemplatesPersister.new(blobstore, logger) }
 
     let(:blobstore) { instance_double('Bosh::Blobstore::BaseClient') }
     let(:instance_plan) { instance_double('Bosh::Director::DeploymentPlan::InstancePlan') }
@@ -29,9 +30,9 @@ module Bosh::Director
 
     let(:compressed_template_contents) { 'some-text-be-be-saved'}
 
-    describe 'self.persist' do
-      def perform
-        RenderedTemplatesPersister.persist(logger, blobstore, instance_plan)
+    describe 'persist' do
+      def perform_persist
+        subject.persist(instance_plan)
       end
 
       before do
@@ -69,7 +70,7 @@ module Bosh::Director
           expect(instance_model).to_not receive(:add_rendered_templates_archive)
           expect(latest_rendered_templates_archive).to_not receive(:update)
           expect(Bosh::Director::Core::Templates::RenderedTemplatesArchive).to_not receive(:new)
-          perform
+          perform_persist
         end
       end
 
@@ -89,20 +90,20 @@ module Bosh::Director
             it 'persists the templates to the blobstore' do
               expect(blobstore).to receive(:create).with(compressed_template_contents)
 
-              perform
+              perform_persist
             end
 
             it 'updates the DB with the new blobstore ID and sha1' do
               expect(latest_rendered_templates_archive).to receive(:update).with({:blobstore_id => new_blobstore_id, :sha1 => new_sha1})
 
-              perform
+              perform_persist
             end
 
             it 'sets the templates archive to the instance plan instance' do
               expect(Bosh::Director::Core::Templates::RenderedTemplatesArchive).to receive(:new).with(new_blobstore_id, new_sha1).and_return(rendered_templates_archive)
               expect(instance).to receive(:rendered_templates_archive=).with(rendered_templates_archive)
 
-              perform
+              perform_persist
             end
           end
 
@@ -115,13 +116,13 @@ module Bosh::Director
               expect(Bosh::Director::Core::Templates::RenderedTemplatesArchive).to receive(:new).with(old_blobstore_id, old_sha1).and_return(rendered_templates_archive)
               expect(instance).to receive(:rendered_templates_archive=).with(rendered_templates_archive)
 
-              perform
+              perform_persist
             end
 
             it 'does NOT persist the templates to the blobstore' do
               expect(blobstore).to_not receive(:create)
 
-              perform
+              perform_persist
             end
           end
         end
@@ -136,7 +137,7 @@ module Bosh::Director
           it 'persists the templates to the blobstore' do
             expect(blobstore).to receive(:create).with(compressed_template_contents)
 
-            perform
+            perform_persist
           end
 
           it 'persists blob record in the database' do
@@ -147,14 +148,14 @@ module Bosh::Director
                 created_at: smurf_time,
               )
 
-            perform
+            perform_persist
           end
 
           it 'sets the templates archive to the instance plan instance' do
             expect(Bosh::Director::Core::Templates::RenderedTemplatesArchive).to receive(:new).with(new_blobstore_id, new_sha1).and_return(rendered_templates_archive)
             expect(instance).to receive(:rendered_templates_archive=).with(rendered_templates_archive)
 
-            perform
+            perform_persist
           end
         end
       end
@@ -168,7 +169,7 @@ module Bosh::Director
         it 'persists the templates to the blobstore' do
           expect(blobstore).to receive(:create).with(compressed_template_contents)
 
-          perform
+          perform_persist
         end
 
         it 'persists blob record in the database' do
@@ -179,14 +180,14 @@ module Bosh::Director
               created_at: smurf_time,
           )
 
-          perform
+          perform_persist
         end
 
         it 'sets the templates archive to the instance plan instance' do
           expect(Bosh::Director::Core::Templates::RenderedTemplatesArchive).to receive(:new).with(new_blobstore_id, new_sha1).and_return(rendered_templates_archive)
           expect(instance).to receive(:rendered_templates_archive=).with(rendered_templates_archive)
 
-          perform
+          perform_persist
         end
       end
     end
