@@ -70,6 +70,15 @@ module Bosh::Director
 
             perform_persist
           end
+
+          context 'when persist through agent fails with AgentUnsupportedAction error' do
+            it 'should delegate to persist_to_blobstore' do
+              allow(rendered_job_instance).to receive(:persist_through_agent).and_raise(AgentUnsupportedAction.new("Action unsupported"))
+
+              expect(subject).to receive(:persist_on_blobstore)
+              perform_persist
+            end
+          end
         end
       end
 

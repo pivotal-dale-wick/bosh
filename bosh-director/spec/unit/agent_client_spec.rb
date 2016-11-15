@@ -197,6 +197,38 @@ module Bosh::Director
           end
         end
 
+        describe 'upload_blob' do
+          it 'sends payload, payload_sha1, and blob_id to the agent' do
+            expect(client).to receive(:send_message).with(:upload_blob, 'base64_encoded_payload', 'payload_sha1', 'blob_id')
+            allow(client).to receive(:get_task)
+            client.upload_blob('base64_encoded_payload', 'payload_sha1', 'blob_id')
+          end
+
+          it 'periodically polls the upload_blob task while it is running' do
+            allow(client).to receive(:handle_message_with_retry).and_return task
+            allow(client).to receive(:sleep).with(AgentClient::DEFAULT_POLL_INTERVAL)
+            expect(client).to receive(:get_task).with('fake-agent_task_id')
+            client.upload_blob('base64_encoded_payload', 'payload_sha1', 'blob_id')
+          end
+
+          context 'when the agent does not implement upload_blob' do
+            it 'raises an undefined action exception' do
+              allow(client).to receive(:handle_method).and_raise(RpcRemoteException, 'unknown message')
+
+              expect {
+                client.upload_blob('base64_encoded_payload', 'payload_sha1', 'blob_id')
+              }.to raise_error(Bosh::Director::AgentUnsupportedAction, 'Unsupported action: upload_blob')
+            end
+          end
+
+          it 'raises an exception for other RPC failures' do
+            allow(client).to receive(:handle_method).and_raise(RpcRemoteException, 'failure has been found')
+
+            expect(client).to_not receive(:warning)
+            expect { client.upload_blob('base64_encoded_payload', 'payload_sha1', 'blob_id') }.to raise_error
+          end
+        end
+
         context 'task can time out' do
           it_acts_as_message_with_timeout :stop
         end
@@ -768,25 +800,6 @@ module Bosh::Director
         expect(client).to receive(:handle_method).and_raise(RpcRemoteException, "Timed out waiting for service 'foo'.")
 
         client.stop
-      end
-    end
-
-    describe '#upload_blob' do
-      subject(:client) { AgentClient.with_vm_credentials_and_agent_id(nil, 'fake-agent-id', timeout: 0.1) }
-
-      let(:nats_rpc) { instance_double('Bosh::Director::NatsRpc') }
-
-      before do
-        allow(Config).to receive(:nats_rpc).and_return(nats_rpc)
-        allow(Api::ResourceManager).to receive(:new)
-      end
-
-      it 'upload blob' do
-        expect(client).to receive(:send_nats_request) do |message_name, args|
-          expect(message_name).to eq(:upload_blob)
-          expect(args).to eq([payload: 'vikrambase64', payloadSha1: 'vikranSha1', blob_id: 'vikram_blobid'])
-        end
-        client.upload_blob(payload: 'vikrambase64', payloadSha1: 'vikranSha1', blob_id: 'vikram_blobid')
       end
     end
   end

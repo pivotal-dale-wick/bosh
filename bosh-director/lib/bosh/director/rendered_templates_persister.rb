@@ -12,7 +12,11 @@ module Bosh::Director
 
     def persist(instance_plan)
       if @enable_nats_delivery
-        send_templates_to_agent(instance_plan)
+        begin
+          send_templates_to_agent(instance_plan)
+        rescue AgentUnsupportedAction
+          persist_on_blobstore(instance_plan)
+        end
       else
         persist_on_blobstore(instance_plan)
       end
