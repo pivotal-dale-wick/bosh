@@ -3,6 +3,7 @@ require 'bosh/director/core/templates/rendered_templates_archive'
 require 'bosh/director/core/templates/compressed_rendered_job_templates'
 require 'digest/sha1'
 require 'tempfile'
+require 'base64'
 
 module Bosh::Director::Core::Templates
   class RenderedJobInstance
@@ -35,7 +36,7 @@ module Bosh::Director::Core::Templates
       end
     end
 
-    def persist(blobstore)
+    def persist_on_blobstore(blobstore)
       file = Tempfile.new('compressed-rendered-job-templates')
 
       compressed_archive = CompressedRenderedJobTemplates.new(file.path)
@@ -47,15 +48,21 @@ module Bosh::Director::Core::Templates
       file.close!
     end
 
-    def generate_compressed_templates
+    def persist_through_agent(agent_client)
       file = Tempfile.new('compressed-rendered-job-templates')
 
       compressed_archive = CompressedRenderedJobTemplates.new(file.path)
       compressed_archive.write(@job_templates)
 
-      compressed_archive
+      generated_blob_id = SecureRandom.uuid
+
+      base64_encoded_templates = Base64.encode64(compressed_archive.contents.read)
+
+      sha = compressed_archive.sha1
+      agent_client.upload_blob(base64_encoded_templates, sha, generated_blob_id)
+      RenderedTemplatesArchive.new(generated_blob_id, sha)
     ensure
-      file.close
+      file.close!
     end
   end
 end

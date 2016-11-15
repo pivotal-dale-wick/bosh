@@ -770,5 +770,24 @@ module Bosh::Director
         client.stop
       end
     end
+
+    describe '#upload_blob' do
+      subject(:client) { AgentClient.with_vm_credentials_and_agent_id(nil, 'fake-agent-id', timeout: 0.1) }
+
+      let(:nats_rpc) { instance_double('Bosh::Director::NatsRpc') }
+
+      before do
+        allow(Config).to receive(:nats_rpc).and_return(nats_rpc)
+        allow(Api::ResourceManager).to receive(:new)
+      end
+
+      it 'upload blob' do
+        expect(client).to receive(:send_nats_request) do |message_name, args|
+          expect(message_name).to eq(:upload_blob)
+          expect(args).to eq([payload: 'vikrambase64', payloadSha1: 'vikranSha1', blob_id: 'vikram_blobid'])
+        end
+        client.upload_blob(payload: 'vikrambase64', payloadSha1: 'vikranSha1', blob_id: 'vikram_blobid')
+      end
+    end
   end
 end

@@ -115,6 +115,10 @@ module Bosh::Director
       send_nats_request(:sync_dns, args, &blk)
     end
 
+    def upload_blob(*args, &blk)
+      send_nats_request(:upload_blob, args, &blk)
+    end
+
     def update_settings(certs, disk_associations)
       begin
         send_message(:update_settings, {'trusted_certs' => certs, 'disk_associations' => disk_associations })
