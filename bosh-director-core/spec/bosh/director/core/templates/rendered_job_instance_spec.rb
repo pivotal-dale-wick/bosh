@@ -279,9 +279,9 @@ module Bosh::Director::Core::Templates
 
       it 'calls agent client upload_blob action' do
         expect(agent_client).to receive(:upload_blob).with(
-          'base64-encoded-content',
+          'random-blob-id',
           'fake-blob-sha1',
-          'random-blob-id'
+          'base64-encoded-content'
         )
         perform
       end

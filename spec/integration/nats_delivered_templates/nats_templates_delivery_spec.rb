@@ -1,4 +1,4 @@
-require_relative '../../spec_helper'
+require 'spec_helper'
 
 describe 'deliver rendered templates through nats', type: :integration do
   with_reset_sandbox_before_each(enable_nats_delivered_templates: true)
@@ -34,8 +34,8 @@ describe 'deliver rendered templates through nats', type: :integration do
   it 'does NOT store rendered templates in the blobstore' do
     deploy_from_scratch(manifest_hash: manifest_hash, cloud_config_hash: cloud_config)
 
-    running_instance = director.instances.select{ |instance| instance.job_name == 'our_instance_group'}.first
-    template_hash = YAML.load(running_instance.read_job_template('job_1_with_many_properties', 'properties_displayer.yml'))
+    running_vm = director.vm('our_instance_group', '0')
+    template_hash = YAML.load(running_vm.read_job_template('job_1_with_many_properties', 'properties_displayer.yml'))
     expect(template_hash['properties_list']['gargamel_color']).to eq('GARGAMEL_COLOR_IS_NOT_BLUE')
 
     zgrep_command = "zgrep GARGAMEL_COLOR_IS_NOT_BLUE #{current_sandbox.blobstore_storage_dir}/*"

@@ -55,12 +55,12 @@ module Bosh::Director::Core::Templates
       compressed_archive.write(@job_templates)
 
       generated_blob_id = SecureRandom.uuid
-      sha = compressed_archive.sha1
+      sha1 = compressed_archive.sha1
       base64_encoded_templates = Base64.encode64(compressed_archive.contents.read)
 
-      agent_client.upload_blob(base64_encoded_templates, sha, generated_blob_id)
+      agent_client.upload_blob(generated_blob_id, sha1, base64_encoded_templates)
 
-      RenderedTemplatesArchive.new(generated_blob_id, sha)
+      RenderedTemplatesArchive.new(generated_blob_id, sha1)
     ensure
       file.close!
     end

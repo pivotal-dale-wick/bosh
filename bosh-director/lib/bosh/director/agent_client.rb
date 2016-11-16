@@ -118,9 +118,13 @@ module Bosh::Director
       send_nats_request(:sync_dns, args, &blk)
     end
 
-    def upload_blob(encoded_payload, payload_sha1, blob_id)
+    def upload_blob(blob_id, payload_sha1, encoded_payload)
       begin
-        send_message(:upload_blob, encoded_payload, payload_sha1, blob_id)
+        send_message(:upload_blob, {
+          'blob_id' => blob_id,
+          'sha1' => payload_sha1,
+          'payload' => encoded_payload,
+        })
       rescue RpcRemoteException => e
         if e.message =~ /unknown message/
           @logger.warn("'upload_blob' 'unknown message' error from the agent: #{e.inspect}")
